@@ -39,7 +39,8 @@ fun SettingsScreen(onBack: () -> Unit, openMemory: () -> Unit) {
     val ctx = LocalContext.current
 
     var proxyUrl by remember(s.proxyUrl) { mutableStateOf(s.proxyUrl) }
-    var token by remember { mutableStateOf(vm.proxyToken) }
+    var token by remember { mutableStateOf(runCatching { vm.proxyToken }.getOrDefault("")) }
+    var saveMsg by remember { mutableStateOf("") }
     var modelUrl by remember { mutableStateOf("") }
     var modelName by remember { mutableStateOf("") }
     var hfToken by remember { mutableStateOf(vm.modelToken) }
@@ -106,7 +107,20 @@ fun SettingsScreen(onBack: () -> Unit, openMemory: () -> Unit) {
                     OutlinedTextField(proxyUrl, { proxyUrl = it }, Modifier.fillMaxWidth().padding(top = 6.dp), label = { Text("Backend proxy URL (https://…)") }, singleLine = true)
                     OutlinedTextField(token, { token = it }, Modifier.fillMaxWidth().padding(top = 6.dp), label = { Text("Proxy access token") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
                     Spacer(Modifier.height(6.dp))
-                    OrbitButton("Save online settings", { vm.set { setProxyUrl(proxyUrl) }; vm.proxyToken = token })
+                    OrbitButton("Save online settings", {
+                        val cleaned = proxyUrl.trim().let { u ->
+                            if (u.isNotEmpty() && !u.startsWith("http", ignoreCase = true)) "https://$u" else u
+                        }
+                        proxyUrl = cleaned
+                        vm.set { setProxyUrl(cleaned) }
+                        saveMsg = try {
+                            vm.proxyToken = token
+                            if (cleaned.isBlank()) "URL is empty." else "Saved: $cleaned"
+                        } catch (e: Exception) {
+                            "URL saved, but the token could not be stored: ${e.message}"
+                        }
+                    })
+                    if (saveMsg.isNotEmpty()) Text(saveMsg, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
                     InfoNote("The token is stored encrypted on this phone and is sent only to the URL above. Messages you send to online AI go through that server to the provider you chose.")
                 }
             }
