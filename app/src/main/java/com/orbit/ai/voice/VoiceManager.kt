@@ -56,7 +56,35 @@ class VoiceManager(private val context: Context) {
             onFail("This phone has no speech recognition service. Install or enable Google speech services.")
             return
         }
-        val r = SpeechRecognizer.createSpeechRecognizer(context)
+        beginRecognition(languageTag, onFinalResult, onFail, attempt = 0)
+    }
+
+    /**
+     * Attempt 0 uses Google's speech service explicitly (many phones, including Vivo, default to a
+     * vendor service that fails with code 5). If that fails with a client error we retry once with
+     * the phone's default service.
+     */
+    private fun beginRecognition(
+        languageTag: String,
+        onFinalResult: (String) -> Unit,
+        onFail: (String) -> Unit,
+        attempt: Int
+    ) {
+        val googleService = android.content.ComponentName(
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.voicesearch.serviceapi.GoogleRecognitionService"
+        )
+        val useGoogle = attempt == 0 && runCatching {
+            context.packageManager.getServiceInfo(googleService, 0)
+        }.isSuccess
+        val r = runCatching {
+            if (useGoogle) SpeechRecognizer.createSpeechRecognizer(context, googleService)
+            else SpeechRecognizer.createSpeechRecognizer(context)
+        }.getOrNull()
+        if (r == null) {
+            onFail("Could not start the speech service.")
+            return
+        }
         recognizer = r
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { _state.value = VoiceState.LISTENING }
@@ -76,7 +104,9 @@ class VoiceManager(private val context: Context) {
             }
             override fun onError(error: Int) {
                 finishListening()
-                onFail(describeError(error))
+                if (error == SpeechRecognizer.ERROR_CLIENT && attempt == 0) {
+                    beginRecognition(languageTag, onFinalResult, onFail, attempt = 1)
+                } else onFail(describeError(error))
             }
         })
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -116,6 +146,9 @@ class VoiceManager(private val context: Context) {
             "This language is not available for speech recognition on this phone."
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission is missing."
         SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The speech service is busy. Try again."
+        SpeechRecognizer.ERROR_CLIENT ->
+            "The speech service refused to start (code 5). Open the Google app, update it, and in phone " +
+                "Settings choose Google as the voice input / speech recognition service."
         else -> "Speech recognition failed (code $code)."
     }
 
