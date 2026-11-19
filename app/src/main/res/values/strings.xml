@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ORBIT AI</string>
+    <string name="channel_reminders">Reminders and timers</string>
+    <string name="channel_wake">Wake word listening</string>
+    <string name="wake_notification_title">ORBIT is listening for its wake word</string>
+    <string name="wake_notification_text">Microphone is active. Tap Stop to turn it off.</string>
+    <string name="wake_stop">Stop</string>
+</resources>
