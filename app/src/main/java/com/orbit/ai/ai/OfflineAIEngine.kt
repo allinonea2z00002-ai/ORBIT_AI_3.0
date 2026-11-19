@@ -110,7 +110,7 @@ class OfflineAIEngine(
                         }
                         append("User: ").append(history.last().content).append("\nAssistant:")
                     }
-                    e.createConversation().use { conv -> conv.sendMessage(prompt).text.trim() }
+                    e.createConversation().use { conv -> conv.sendMessage(prompt).toString().trim() }
                 }
             }
         }
